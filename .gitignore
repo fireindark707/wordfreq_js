@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.DS_Store
+wordfreq-python/
+*.log
+*.tmp
+tests/verify_bundle.html
+assembly/
+asconfig.json
+build/
