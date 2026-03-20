@@ -15,22 +15,18 @@ my-chrome-extension/
 ├── manifest.json
 ├── background.js              # 你的 Service Worker
 ├── content.js                 # 你的 Content Script
-├── dist/
-│   ├── wordfreq.bundle.js     # ESM 格式构建包（用于 Service Worker）
-│   └── wordfreq.iife.js       # 全局变量格式构建包（用于 Content Script/Popup）
-└── data/                      # 词库数据目录
-    ├── small_en.msgpack.gz
-    ├── small_zh.msgpack.gz
-    └── ...
+└── dist/
+    ├── wordfreq.bundle.js     # ESM 格式构建包（用于 Service Worker）
+    └── wordfreq.iife.js       # 全局变量格式构建包（用于 Content Script/Popup）
 ```
 
-你可以直接从本项目把生成的 `dist/` 文件夹和装有对应语言词库的 `data/` 文件夹（不需要全部语言，只保留你业务需要的即可，以缩小插件体积）复制到你的插件目录下。
+你可以直接从本项目把生成的 `dist/` 文件夹复制到你的插件目录下。**不需要**把几百兆的 `data/` 文件夹打包进插件中，我们将使用远程 CDN 直接按需加载数据。
 
 ---
 
 ## 步骤 2：配置 `manifest.json`
 
-最关键的一步是，如果你使用的是基于 `fetch` 加载本地数据（在浏览器中这是唯一的办法），你必须将数据文件夹标记为对拓展可访问的内容 (`web_accessible_resources`)，否则由于安全策略会导致无法加载 `msgpack.gz`。
+由于我们现在推荐直接通过 GitHub Raw URL 远程加载数据，我们不需要在 `web_accessible_resources` 中配置本地数据目录。Chrome 扩展中默认允许使用 `fetch` 访问 HTTPS 资源（如果遇到跨域或 CSP 问题，可以在 manifest 中声明 host permissions 或 CSP）。
 
 ```json
 {
@@ -46,14 +42,6 @@ my-chrome-extension/
       "matches": ["<all_urls>"],
       "js": ["dist/wordfreq.iife.js", "content.js"]
     }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "data/*.msgpack.gz"
-      ],
-      "matches": ["<all_urls>"]
-    }
   ]
 }
 ```
@@ -64,14 +52,14 @@ my-chrome-extension/
 
 ## 步骤 3：在 Service Worker (`background.js`) 中使用
 
-服务工作线程 (Service Worker) 支持 ESM 模块，因此你可以直接 `import`。加载数据时，需要利用 `chrome.runtime.getURL()` 将相对路径转为插件的绝对路径。
+服务工作线程 (Service Worker) 支持 ESM 模块，因此你可以直接 `import`。我们将配置 `BrowserDataFetcher` 使用 GitHub Raw URL 作为数据源。
 
 ```javascript
 // background.js
 import { Wordfreq, BrowserDataFetcher } from './dist/wordfreq.bundle.js';
 
-// 1. 获取插件内 data 目录的基础绝对路径
-const dataBaseUrl = chrome.runtime.getURL('data');
+// 1. 使用远程 GitHub 原生文件的 URL 作为基地址
+const dataBaseUrl = 'https://raw.githubusercontent.com/fireindark707/wordfreq_js/main/data';
 
 // 2. 初始化抓取器
 const fetcher = new BrowserDataFetcher(dataBaseUrl);
@@ -110,8 +98,8 @@ Content Script 和普通的 Web 页面、Popup 弹窗最适合使用全局变量
     try {
         const { Wordfreq, BrowserDataFetcher } = WordfreqLib;
         
-        // 1. 获取 data 目录的基础路径
-        const dataBaseUrl = chrome.runtime.getURL('data');
+        // 1. 使用远程 GitHub 原生文件的 URL 作为基地址
+        const dataBaseUrl = 'https://raw.githubusercontent.com/fireindark707/wordfreq_js/main/data';
         const fetcher = new BrowserDataFetcher(dataBaseUrl);
         
         // 2. 初始化查询实例
@@ -130,11 +118,11 @@ Content Script 和普通的 Web 页面、Popup 弹窗最适合使用全局变量
 })();
 ```
 
----
+## 优势：为什么要使用远程加载？
 
-## Q&A: 优化插件体积
+原先 `data/` 目录非常庞大，包含数十个上百兆的压缩包。若要发布扩展，把这种体量的数据打包进插件不仅会让下载体积变得臃肿，还会严重影响 Chrome Web Store 的审核进度。
 
-`data/` 目录非常庞大，包含数十个上百兆的压缩包。若要发布扩展，强烈建议**只保留你确定支持的语言**。
-
-例如，若你的插件只查英文小语料，可以将 `data` 目录精简到只留下：
-`data/small_en.msgpack.gz`（仅仅 100 多 KB 的大小），这将极大地优化用户的安装体验。
+改为使用 GitHub Raw URL (`https://raw.githubusercontent.com/fireindark707/wordfreq_js/main/data`) 进行远程加载有以下优势：
+1. **插件即装即用**：打包体积瞬间缩小到只有几十 KB。
+2. **按需加载**：只有在代码 `wf.init()` 时，才会下载对应语言的数据文件。
+3. **无缝使用**：绕过了 CDN 可能存在的仓库体积限制，利用浏览器内置的 HTTP 缓存可以确保数据在首次下载后极速响应。

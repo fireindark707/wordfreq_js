@@ -43,13 +43,13 @@ console.log(await wf.topNList(10));       // Top 10 words
 
 ### Browser / Chrome Extension
 
-In a browser environment, use the `BrowserDataFetcher` which uses the `fetch` API.
+In a browser environment, use the `BrowserDataFetcher` which uses the `fetch` API. You can fetch data remotely from the GitHub repository via GitHub Raw URL to avoid bundling megabytes of data into your extension.
 
 ```javascript
 import { Wordfreq, BrowserDataFetcher } from 'wordfreq-js';
 
-// URL to your data directory
-const dataUrl = 'https://your-domain.com/wordfreq-data';
+// URL to the hosted data directory via GitHub Raw
+const dataUrl = 'https://raw.githubusercontent.com/fireindark707/wordfreq_js/main/data';
 const fetcher = new BrowserDataFetcher(dataUrl);
 
 const wf = new Wordfreq('en', fetcher, 'small');
@@ -57,6 +57,7 @@ await wf.init();
 
 console.log(wf.wordFrequency('hello'));
 ```
+
 
 ## Supported Languages & Statistics
 
